@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>五子棋人机大战</title>
+</head>
+<body>
+<div id="mylegend">loading......</div>
+    <script type="text/javascript" src="lufylegend-1.10.1.min.js"></script>
+    <script type="text/javascript">
+    function doScroll() {
+        if(window.pageYOffset === 0) {
+            window.scrollTo(0, 1);
+        }
+    }
+    window.onload = function() {
+        setTimeout(doScroll, 100);
+        //初始化
+        init(10,"mylegend",650,650,main,LEvent.INIT);
+    }
+    window.onorientationchange = function() {
+        setTimeout(doScroll, 100);
+    };
+    window.onresize = function() {
+        setTimeout(doScroll, 100);
+    }
+    //背景层、格子层、棋子层
+    var backLayer,cellLayer,chessLayer;
+    var BOARD_SIZE = 15;//棋盘格子数量(15*15);
+    var OFFSET = 40;//格子偏移量
+    var CELL_WIDTH = 40;//行宽
+    var CENTER = 8;
+    var array = new Array();//记录每个格子是否有棋子0表示空位1表示己方棋子2表示地方棋子
+    var isPlay = true;//是否该玩家下棋
+    var C_STEP = 0,P_STEP = 0;//AI和玩家走的棋数
+
+    function main(){
+        backLayer = new LSprite();
+        backLayer.graphics.drawRect(1,"darkorange",[0,0,LGlobal.width,LGlobal.height],true,"darkorange");
+        addChild(backLayer);
+        var textFiled;
+        //画棋盘周围的数字和字母
+        for(var i = 0;i<BOARD_SIZE;i++){
+            textField = new LTextField();
+            textField.color = "black";
+            textField.x = OFFSET >> 2;
+            textField.y = OFFSET+(CELL_WIDTH*(i));
+            textField.font="Arial";
+            textField.size = 8;
+            textField.text = BOARD_SIZE - i;
+            backLayer.addChild(textField);
+            textField = new LTextField();
+            textField.color = "black";
+            textField.x = OFFSET+(CELL_WIDTH*i);
+            textField.y = ((OFFSET*3) >> 2) + OFFSET + CELL_WIDTH * (BOARD_SIZE-1);
+            textField.font = "Arial";
+            textField.size = 8;
+            textField.text = String.fromCharCode(65+i);
+            backLayer.addChild(textField);
+        }
+        //AI初始化
+        AI.init();
+
+        //画出棋盘
+        drawBoard();
+
+        chessLayer = new LSprite();
+        backLayer.addChild(chessLayer);
+
+        //按钮
+        //var resetButton = new LButtonSample1("重玩");
+        //resetButton.x = 10;
+        //resetButton.y = 500;
+        //backLayer.addChild(resetButton);
+        //resetButton.addEventListener(LMouseEvent.MOUSE_UP,reset);
+
+        backLayer.addEventListener(LMouseEvent.MOUSE_MOVE,onmove);
+        backLayer.addEventListener(LMouseEvent.MOUSE_DOWN,ondown);
+
+    };
+
+    //function reset(){
+
+    //};
+
+    //画棋盘
+    function drawBoard(){
+        //画竖线条
+        for(var i = 0;i < BOARD_SIZE;i++){
+            backLayer.graphics.drawLine(2,"#000000",[i*CELL_WIDTH+OFFSET,OFFSET,i*CELL_WIDTH+OFFSET,(BOARD_SIZE-1)*CELL_WIDTH+OFFSET]);
+        }
+        //画横线条
+        for(var i = 0;i < BOARD_SIZE;i++){
+            backLayer.graphics.drawLine(2,"#000000",[OFFSET,i*CELL_WIDTH+OFFSET,(BOARD_SIZE-1)*CELL_WIDTH+OFFSET,i*CELL_WIDTH+OFFSET]);
+        }
+
+        //画棋盘上的小圆点
+        drawStar(CENTER,CENTER);
+        drawStar((BOARD_SIZE + 1) >> 2,(BOARD_SIZE + 1) >> 2);
+        drawStar((BOARD_SIZE + 1) >> 2,((BOARD_SIZE + 1) * 3) >> 2);
+        drawStar(((BOARD_SIZE + 1)*3) >> 2,(BOARD_SIZE + 1) >> 2);
+        drawStar(((BOARD_SIZE + 1)*3) >> 2,((BOARD_SIZE + 1) * 3) >> 2);
+    };
+
+    function drawStar(cx,cy){
+        var x = (cx - 1)*CELL_WIDTH+OFFSET;
+        var y = (cy - 1) * CELL_WIDTH+OFFSET;
+        backLayer.graphics.drawArc(0,"#000000",[x,y,4,0,Math.PI * 2],true,"#000000");
+    };
+
+    function onmove(event){
+        var x = Math.round((event.offsetX-OFFSET)/CELL_WIDTH);
+        var y = Math.round((event.offsetY-OFFSET)/CELL_WIDTH)
+        drawCell(x,y);
+    };
+
+    function ondown(event){
+        var x = Math.round((event.offsetX-OFFSET)/CELL_WIDTH);
+        var y = Math.round((event.offsetY-OFFSET)/CELL_WIDTH)
+        if(array[x][y] == 0 && isPlay){
+            array[x][y] = 1;
+            drawChess(x,y,"#000000");
+            P_STEP += 1;
+            if(AI.isAIWin(x,y,1) == 1){
+                alert("恭喜你，打赢了！");
+                return false;
+            }
+            //AI下棋
+            var point = AI.analysis(x,y);
+            drawChess(point.x,point.y,"#ffffff");
+            C_STEP += 1;
+            array[point.x][point.y] = 2;
+            if(AI.isAIWin(point.x,point.y,2) == 2){
+                alert("打输了！请再接再厉");
+                return false;
+            }
+            isPlay = true;
+        }
+    };
+    //在棋盘指定位置画出黑白棋子
+    function drawChess(cx,cy,color){
+        //棋子欲放入格子的中心坐标
+        var x = cx * CELL_WIDTH + OFFSET;
+        var y = cy * CELL_WIDTH + OFFSET;
+        var R = CELL_WIDTH >> 1;//棋子半径，为格子宽度/2
+        chessLayer.graphics.drawArc(0,color,[x,y,R,0,Math.PI * 2],true,color);
+        isPlay = false;
+    };
+    //画出鼠标点击后棋子欲落下的区域
+    function drawCell(cx,cy){
+        if(cx >= 0 && cx < BOARD_SIZE && cy >= 0 && cy < BOARD_SIZE){
+            if(cellLayer){
+                cellLayer.die();
+                cellLayer.removeAllChild();
+                backLayer.removeChild(cellLayer);
+                cellLayer = null;
+            }
+            cellLayer = new LSprite();
+            backLayer.addChild(cellLayer);
+            var length = CELL_WIDTH >> 1;
+            cx = cx * CELL_WIDTH + OFFSET;
+            cy = cy * CELL_WIDTH + OFFSET;
+            cellLayer.graphics.drawLine(2,"red",[cx-length,cy - length,cx-length/2,cy-length]);
+            cellLayer.graphics.drawLine(2,"red",[cx-length,cy - length,cx-length,cy-length/2]);
+            cellLayer.graphics.drawLine(2,"red",[cx+length,cy - length,cx+length/2,cy-length]);
+            cellLayer.graphics.drawLine(2,"red",[cx+length,cy - length,cx+length,cy-length/2]);
+            cellLayer.graphics.drawLine(2,"red",[cx+length,cy + length,cx+length,cy+length/2]);
+            cellLayer.graphics.drawLine(2,"red",[cx+length,cy + length,cx+length/2,cy+length]);
+            cellLayer.graphics.drawLine(2,"red",[cx-length,cy + length,cx-length/2,cy+length]);
+            cellLayer.graphics.drawLine(2,"red",[cx-length,cy + length,cx-length,cy+length/2]);
+        }
+    };
+    //随机获得一定范围内的数字
+    function random(options){
+        if(options){
+            var max = 0,min = 0;
+            if(options.max){
+                max = options.max;
+            }
+            if(options.min){
+                min = options.min;
+            }
+            return (min+Math.random()*(max-min)) >>> 0;
+        }
+        return 0;
+    };
+    function Point(x,y){
+        var self = this;
+        self.x = x;
+        self.y = y;
+    };
+    var AI = AI || {};
+    //代表每个方向
+    AI.direction = {
+        TOP:1,
+        BOTTOM:2,
+        LEFT:3,
+        RIGHT:4,
+        LEFT_TOP:5,
+        LEFT_BOTTOM:6,
+        RIGHT_TOP:7,
+        RIGHT_BOTTOM:8
+    };
+    //初始化
+    AI.init = function(){
+        //初始化数组为0
+        for(var i = 0;i < BOARD_SIZE;i++){
+            array[i] = new Array();
+            for(var j = 0;j < BOARD_SIZE;j++){
+                array[i][j] = 0;
+            }
+        }
+    };
+    //AI棋型分析
+    AI.analysis = function(x,y){
+        //如果为第一步则，在玩家棋周围一格随机下棋，保证每一局棋第一步都不一样
+        if(P_STEP == 1){
+            return this.getFirstPoint(x,y);
+        }
+        var maxX = new Array(),
+            maxY = new Array(),
+            maxWeight = 0,
+            max = new Array(),
+            min = new Array(),
+            i, j, tem;
+        for (i = BOARD_SIZE - 1; i >= 0; i--) {
+            for (j = BOARD_SIZE; j >= 0; j--) {
+                if (array[i][j] !== 0) {
+                    continue;
+                }
+                tem = this.computerWeight(i, j,2);
+                if (tem > maxWeight) {
+                    maxWeight = tem;
+                    maxX = i;
+                    maxY = j;
+                }
+            }
+        }
+        return new Point(maxX,maxY);
+    };
+    //下子到i，j X方向 结果: 多少连子 两边是否截断
+    AI.putDirectX = function (i, j, chessColor) {
+        var m, n,
+            nums = 1,
+            side1 = false,//两边是否被截断
+            side2 = false;
+        for (m = j - 1; m >= 0; m--) {
+            if (array[i][m] === chessColor) {
+                nums++;
+            }
+            else {
+                if (array[i][m] === 0) {
+                    side1 = true;//如果为空子，则没有截断
+                }
+                break;
+            }
+        }
+        for (m = j + 1; m < BOARD_SIZE; m++) {
+            if (array[i][m] === chessColor) {
+                nums++;
+            }
+            else {
+                if (array[i][m] === 0) {
+                    side2 = true;
+                }
+                break;
+            }
+        }
+        return {"nums": nums, "side1": side1, "side2": side2};
+    },
+        //下子到i，j Y方向 结果
+        AI.putDirectY = function (i, j, chessColor) {
+            var m, n,
+                nums = 1,
+                side1 = false,
+                side2 = false;
+            for (m = i - 1; m >= 0; m--) {
+                if (array[m][j] === chessColor) {
+                    nums++;
+                }
+                else {
+                    if (array[m][j] === 0) {
+                        side1 = true;
+                    }
+                    break;
+                }
+            }
+            for (m = i + 1; m < BOARD_SIZE; m++) {
+                if (array[m][j] === chessColor) {
+                    nums++;
+                }
+                else {
+                    if (array[m][j] === 0) {
+                        side2 = true;
+                    }
+                    break;
+                }
+            }
+            return {"nums": nums, "side1": side1, "side2": side2};
+        },
+        //下子到i，j XY方向 结果
+        AI.putDirectXY = function (i, j, chessColor) {
+            var m, n,
+                nums = 1,
+                side1 = false,
+                side2 = false;
+            for (m = i - 1, n = j - 1; m >= 0 && n >= 0; m--, n--) {
+                if (array[m][n] === chessColor) {
+                    nums++;
+                }
+                else {
+                    if (array[m][n] === 0) {
+                        side1 = true;
+                    }
+                    break;
+                }
+            }
+            for (m = i + 1, n = j + 1; m < BOARD_SIZE && n < BOARD_SIZE; m++, n++) {
+                if (array[m][n] === chessColor) {
+                    nums++;
+                }
+                else {
+                    if (array[m][n] === 0) {
+                        side2 = true;
+                    }
+                    break;
+                }
+            }
+            return {"nums": nums, "side1": side1, "side2": side2};
+        },
+        AI.putDirectYX = function (i, j, chessColor) {
+            var m, n,
+                nums = 1,
+                side1 = false,
+                side2 = false;
+            for (m = i - 1, n = j + 1; m >= 0 && n < BOARD_SIZE; m--, n++) {
+                if (array[m][n] === chessColor) {
+                    nums++;
+                }
+                else {
+                    if (array[m][n] === 0) {
+                        side1 = true;
+                    }
+                    break;
+                }
+            }
+            for (m = i + 1, n = j - 1; m < BOARD_SIZE && n >= 0; m++, n--) {
+                if (array[m][n] === chessColor) {
+                    nums++;
+                }
+                else {
+                    if (array[m][n] === 0) {
+                        side2 = true;
+                    }
+                    break;
+                }
+            }
+            return {"nums": nums, "side1": side1, "side2": side2};
+        },
+//计算AI下棋权重
+        AI.computerWeight = function(i,j,chessColor){
+            var weight = (BOARD_SIZE - 1) - (Math.abs(i - BOARD_SIZE >> 1) + Math.abs(j - BOARD_SIZE >> 1)), //基于棋盘位置权重（越靠近棋盘中心权重越大）
+                pointInfo = {},	//某点下子后连子信息
+                //x方向
+                pointInfo = this.putDirectX(i, j, chessColor);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, true);//AI下子权重
+            pointInfo = this.putDirectX(i, j, chessColor-1);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, false);//player下子权重
+            //y方向
+            pointInfo = this.putDirectY(i, j, chessColor);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, true);//AI下子权重
+            pointInfo = this.putDirectY(i, j, chessColor-1);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, false);//player下子权重
+            //左斜方向
+            pointInfo = this.putDirectXY(i, j, chessColor);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, true);//AI下子权重
+            pointInfo = this.putDirectXY(i, j, chessColor-1);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, false);//player下子权重
+            //右斜方向
+            pointInfo = this.putDirectYX(i, j, chessColor);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, true);//AI下子权重
+            pointInfo = this.putDirectYX(i, j, chessColor-1);
+            weight += this.weightStatus(pointInfo.nums, pointInfo.side1, pointInfo.side2, false);//player下子权重
+            return weight;
+        };
+    //权重方案   活：两边为空可下子，死：一边为空
+    AI.weightStatus = function (nums, side1, side2, isAI) {
+        var weight = 0;
+        switch (nums) {
+            case 1:
+                if (side1 && side2) {
+                    weight = isAI ? 15 : 10;	//一
+                }
+                break;
+            case 2:
+                if (side1 && side2) {
+                    weight = isAI ? 100 : 50;	//活二
+                }
+                else if (side1 || side2) {
+                    weight = isAI ? 10 : 5;	//死二
+                }
+                break;
+            case 3:
+                if (side1 && side2) {
+                    weight = isAI ? 500 : 200;	//活三
+                }
+                else if (side1 || side2) {
+                    weight = isAI ? 30 : 20;	//死三
+                }
+                break;
+            case 4:
+                if (side1 && side2) {
+                    weight = isAI ? 5000 : 2000;	//活四
+                }
+                else if (side1 || side2) {
+                    weight = isAI ? 400 : 100;	//死四
+                }
+                break;
+            case 5:
+                weight = isAI ? 100000 : 10000;	//五
+                break;
+            default:
+                weight = isAI ? 500000 : 250000;
+                break;
+        }
+        return weight;
+    };
+    //判断是否胜出，胜返回true否则返回false
+    //思路：从下子的地方为中心朝4个方向判断，若连成五子，遇空子或敌方棋子则改变方向则胜出
+    //不用全盘遍历，因为只有下子的地方才会有胜出的可能
+    //flag标识AI还是玩家1为玩家2为AI
+    AI.isAIWin = function(x,y,flag){
+        var count1 = 0;
+        var count2 = 0;
+        var count3 = 0;
+        var count4 = 0;
+        //左右判断
+        for(var i = x;i >= 0;i--){
+            if(array[i][y]!=flag){
+                break;
+            }
+            count1++;
+        }
+        for(var i = x+1;i<BOARD_SIZE;i++){
+            if(array[i][y] != flag){
+                break;
+            }
+            count1++;
+        }
+        //上下判断
+        for(var i = y;i>=0;i--){
+            if(array[x][i] != flag){
+                break;
+            }
+            count2++;
+        }
+        for(var i = y+1;i<BOARD_SIZE;i++){
+            if(array[x][i] != flag){
+                break;
+            }
+            count2++;
+        }
+        //左上右下判断
+        for(var i = x,j=y;i>=0&&j>=0;i--,j--){
+            if(array[i][j] != flag){
+                break;
+            }
+            count3++;
+        }
+        for(var i = x+1,j=y+1;i<BOARD_SIZE&&j<BOARD_SIZE;i++,j++){
+            if(array[i][j] != flag){
+                break;
+            }
+            count3++;
+        }
+        //右上左下判断
+        for(var i =x,j=y;i>=0&&j<BOARD_SIZE;i--,j++){
+            if(array[i][j] != flag){
+                break;
+            }
+            count4++;
+        }
+        for(var i =x+1,j=y-1;i<BOARD_SIZE&&j>=0;i++,j--){
+            if(array[i][j] != flag){
+                break;
+            }
+            count4++;
+        }
+        var win = 0;//AI是否赢了
+        if(count1>=5||count2>=5||count3>=5||count4>=5){
+            win = flag;
+        }
+        return win;
+    };
+    //AI第一步棋
+    //参数x,y为玩家第一步棋的坐标
+    AI.getFirstPoint = function(x,y){
+        var point = new Point(x,y);
+        if(x < 3 || x > BOARD_SIZE - 3 || y < 3 || y > BOARD_SIZE - 3){
+            point.x = BOARD_SIZE >> 1;
+            point.y = BOARD_SIZE >> 1;
+        }else{
+            var direction = random({
+                min:1,
+                max:8
+            });
+            switch(direction){
+                case this.direction.TOP:
+                    point.y = y - 1;
+                    break;
+                case this.direction.BOTTOM:
+                    point.y = y + 1;
+                    break;
+                case this.direction.LEFT:
+                    point.x = x - 1;
+                    break;
+                case this.direction.RIGHT:
+                    point.x = x + 1;
+                    break;
+                case this.direction.LEFT_TOP:
+                    point.x = x - 1;
+                    point.y = y - 1;
+                    break;
+                case this.direction.LEFT_BOTTOM:
+                    point.x = x - 1;
+                    point.y = y + 1;
+                    break;
+                case this.direction.RIGHT_TOP:
+                    point.x = x + 1;
+                    point.y = y - 1;
+                    break;
+                case this.direction.RIGHT_BOTTOM:
+                    point.x = x + 1;
+                    point.y = y + 1;
+                    break;
+                default:
+                    point.x = x - 1;
+                    point.y = y - 1;
+                    break;
+            }
+        }
+        return point;
+    };
+    </script>
+</body>
+</html>
